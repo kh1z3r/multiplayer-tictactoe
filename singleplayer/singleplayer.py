@@ -2,7 +2,7 @@
 # TIC TAC TOE singleplayer.py
 # CNT4007 Project by Fareed Fareed-Uddin, Khizer Butt, Kevin Rapkin, Pedro Mantese, Juan Martinez
 # version 1 on 3/18/2025 - Kevin Rapkin
-#
+# version 2 on 3/20/2025 - Khizer Butt (UI Changes)
 #
 #
 #
