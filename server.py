@@ -1,0 +1,152 @@
+import socket
+import threading
+import json
+import sys
+
+class TicTacToeServer:
+    def __init__(self, host='0.0.0.0', port=5555):
+        self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server.bind((host, port))
+        self.server.listen(2)
+        self.clients = []
+        self.addresses = []
+        self.current_player = "X"
+        self.board = [['' for _ in range(3)] for _ in range(3)]
+        self.game_over = False
+        print(f"Server started on {host}:{port}")
+        print(f"Your IP address is: {socket.gethostbyname(socket.gethostname())}")
+
+    def broadcast(self, message):
+        """Send message to all connected clients"""
+        for client in self.clients:
+            try:
+                client.send(json.dumps(message).encode())
+            except:
+                self.remove_client(client)
+
+    def handle_client(self, client, address):
+        """Handle individual client connection"""
+        # Assign player symbol (X or O)
+        player = "X" if len(self.clients) == 1 else "O"
+        client.send(json.dumps({"type": "symbol", "symbol": player}).encode())
+
+        # If we have two players, start the game
+        if len(self.clients) == 2:
+            self.broadcast({"type": "start_game", "current_player": self.current_player})
+
+        while True:
+            try:
+                message = client.recv(1024).decode()
+                if not message:
+                    break
+
+                data = json.loads(message)
+                if data["type"] == "move":
+                    if self.current_player == player:
+                        x, y = data["position"]
+                        if self.is_valid_move(x, y):
+                            self.board[y][x] = player
+                            self.broadcast({
+                                "type": "update_board",
+                                "board": self.board,
+                                "position": [x, y],
+                                "player": player
+                            })
+
+                            if self.check_winner(player):
+                                self.broadcast({
+                                    "type": "game_over",
+                                    "winner": player
+                                })
+                                self.game_over = True
+                            elif self.is_board_full():
+                                self.broadcast({
+                                    "type": "game_over",
+                                    "winner": "Draw"
+                                })
+                                self.game_over = True
+                            else:
+                                self.current_player = "O" if self.current_player == "X" else "X"
+                                self.broadcast({
+                                    "type": "next_turn",
+                                    "player": self.current_player
+                                })
+
+                elif data["type"] == "restart":
+                    self.board = [['' for _ in range(3)] for _ in range(3)]
+                    self.current_player = "X"
+                    self.game_over = False
+                    self.broadcast({
+                        "type": "restart_game",
+                        "current_player": self.current_player
+                    })
+
+            except:
+                break
+
+        self.remove_client(client)
+
+    def remove_client(self, client):
+        """Remove client and clean up"""
+        if client in self.clients:
+            index = self.clients.index(client)
+            self.clients.remove(client)
+            self.addresses.pop(index)
+            client.close()
+            if len(self.clients) < 2:
+                self.board = [['' for _ in range(3)] for _ in range(3)]
+                self.current_player = "X"
+                self.game_over = False
+                if self.clients:
+                    self.clients[0].send(json.dumps({"type": "opponent_disconnected"}).encode())
+
+    def is_valid_move(self, x, y):
+        """Check if move is valid"""
+        return 0 <= x < 3 and 0 <= y < 3 and self.board[y][x] == ''
+
+    def check_winner(self, player):
+        """Check if current player has won"""
+        # Check rows
+        for row in self.board:
+            if all(cell == player for cell in row):
+                return True
+
+        # Check columns
+        for col in range(3):
+            if all(self.board[row][col] == player for row in range(3)):
+                return True
+
+        # Check diagonals
+        if all(self.board[i][i] == player for i in range(3)):
+            return True
+        if all(self.board[i][2-i] == player for i in range(3)):
+            return True
+
+        return False
+
+    def is_board_full(self):
+        """Check if board is full (draw)"""
+        return all(cell != '' for row in self.board for cell in row)
+
+    def start(self):
+        """Start the server and accept connections"""
+        while True:
+            client, address = self.server.accept()
+            if len(self.clients) < 2:
+                print(f"Connection from {address}")
+                self.clients.append(client)
+                self.addresses.append(address)
+                thread = threading.Thread(target=self.handle_client, args=(client, address))
+                thread.daemon = True
+                thread.start()
+            else:
+                client.send(json.dumps({"type": "server_full"}).encode())
+                client.close()
+
+if __name__ == "__main__":
+    try:
+        server = TicTacToeServer()
+        server.start()
+    except Exception as e:
+        print(f"Error: {e}")
+        sys.exit(1) 

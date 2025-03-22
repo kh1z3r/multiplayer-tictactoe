@@ -36,6 +36,11 @@ except:
     print("Warning: Could not load sound files. Continuing without sound.")
     sounds_loaded = False
 
+# Helper function to play sound safely
+def play_sound(sound):
+    if sounds_loaded:
+        sound.play()
+
 # Set window parameters - increased vertical size to accommodate turn indicator
 surface = pygame.display.set_mode((600, 650))  # Added 50 pixels for indicator
 pygame.display.set_caption('TIC TAC TOE')
@@ -56,30 +61,12 @@ DRAW_TEXT = (100, 100, 100)   # Gray for draw
 WINNING_LINE_X = (255, 80, 80, 200)  # Semi-transparent red for X winning line
 WINNING_LINE_O = (80, 80, 255, 200)  # Semi-transparent blue for O winning line
 
-# Confetti colors
-CONFETTI_COLORS = [
-    (255, 0, 0),    # Red
-    (0, 255, 0),    # Green
-    (0, 0, 255),    # Blue
-    (255, 255, 0),  # Yellow
-    (0, 255, 255),  # Cyan
-    (255, 0, 255),  # Magenta
-    (255, 165, 0),  # Orange
-    (128, 0, 128),  # Purple
-    (255, 192, 203) # Pink
-]
-
 # Font setup
 title_font = pygame.font.SysFont('comicsans', 72, bold=True)
 button_font = pygame.font.SysFont('comicsans', 48)
 win_font = pygame.font.SysFont('comicsans', 64, bold=True)
 instruction_font = pygame.font.SysFont('comicsans', 24)
 turn_font = pygame.font.SysFont('comicsans', 36, bold=True)
-
-# Helper function to play sound safely
-def play_sound(sound):
-    if sounds_loaded:
-        sound.play()
 
 # Modified Board class to handle offset, turn display and winning line
 class ModifiedBoard(Board):
@@ -211,73 +198,6 @@ class ModifiedBoard(Board):
         self.winning_animation = 0
         self.current_player = "X"
 
-# Confetti class
-class Confetti:
-    def __init__(self, x, y, winner):
-        self.x = x
-        self.y = y
-        self.size = random.randint(5, 10)
-        self.color = random.choice(CONFETTI_COLORS)
-        self.speed_y = random.uniform(1, 5)
-        self.speed_x = random.uniform(-2, 2)
-        self.rotation = random.uniform(0, 360)
-        self.rotation_speed = random.uniform(-5, 5)
-        self.lifetime = 255  # Used for fading out
-        
-        # Adjust color based on winner
-        if winner == "X":
-            # Add more red to the color mix
-            self.color = (
-                min(255, self.color[0] + 50), 
-                max(0, self.color[1] - 20), 
-                max(0, self.color[2] - 20)
-            )
-        elif winner == "O":
-            # Add more blue to the color mix
-            self.color = (
-                max(0, self.color[0] - 20), 
-                max(0, self.color[1] - 20), 
-                min(255, self.color[2] + 50)
-            )
-    
-    def update(self):
-        self.y += self.speed_y
-        self.x += self.speed_x
-        self.rotation += self.rotation_speed
-        self.lifetime -= 1
-        return self.lifetime > 0 and self.y < 650  # Adjusted for larger screen
-    
-    def draw(self, surface):
-        # Create a rotated rect for the confetti piece
-        points = []
-        rad = math.radians(self.rotation)
-        sin = math.sin(rad)
-        cos = math.cos(rad)
-        
-        # Rectangle corners
-        for x_offset, y_offset in [(-0.5, -1), (0.5, -1), (0.5, 1), (-0.5, 1)]:
-            x = x_offset * self.size
-            y = y_offset * self.size
-            
-            # Rotate point
-            x_rot = x * cos - y * sin
-            y_rot = x * sin + y * cos
-            
-            points.append((self.x + x_rot, self.y + y_rot))
-        
-        # Draw with fading alpha
-        color_with_alpha = (self.color[0], self.color[1], self.color[2], 
-                            min(255, self.lifetime))
-        
-        # Create a surface for this confetti piece
-        confetti_surface = pygame.Surface((self.size*2, self.size*2), pygame.SRCALPHA)
-        pygame.draw.polygon(confetti_surface, color_with_alpha, 
-                           [(p[0]-self.x+self.size, p[1]-self.y+self.size) for p in points])
-        
-        # Blit to main surface
-        surface.blit(confetti_surface, (self.x-self.size, self.y-self.size))
-
-
 # Button class for 3D effect
 class Button:
     def __init__(self, x, y, width, height, text, text_color, bg_color, hover_color, shadow_color):
@@ -334,7 +254,7 @@ class Button:
 def main_menu():
     # Create buttons
     play_button = Button(200, 200, 200, 60, "PLAY", BUTTON_TEXT, BUTTON_BG, BUTTON_HOVER, BUTTON_SHADOW)
-    best_of_3_button = Button(180, 280, 240, 80, "BEST OF 3", BUTTON_TEXT, BUTTON_BG, BUTTON_HOVER, BUTTON_SHADOW)
+    best_of_3_button = Button(150, 280, 300, 60, "BEST OF 3", BUTTON_TEXT, BUTTON_BG, BUTTON_HOVER, BUTTON_SHADOW)
     exit_button = Button(200, 400, 200, 60, "EXIT", BUTTON_TEXT, EXIT_BG, EXIT_HOVER, EXIT_SHADOW)
     
     menu_running = True
@@ -344,7 +264,7 @@ def main_menu():
         surface.fill(CREAM_BG)
 
         # Draw Title
-        title_text = title_font.render("TIC TACO 2X", True, BLACK)
+        title_text = title_font.render("TIC TAC TOE", True, BLACK)
         title_rect = title_text.get_rect(center=(300, 120))
         surface.blit(title_text, title_rect)
 
@@ -386,20 +306,20 @@ def main_menu():
 
     return selected_mode
 
-
 def game():
-    board = Board()
+    board = ModifiedBoard()  # Use our modified board class
     user = "X"
     game_running = True
     winner = None
     is_draw = False
-    confetti_pieces = []
     clock = pygame.time.Clock()
-    show_confetti = False
     move_sound_played = False
+    animation_timer = 0  # Add animation timer
 
     while game_running:
         clock.tick(60)
+        animation_timer += 1  # Increment animation timer
+        
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -425,6 +345,7 @@ def game():
 
                     if board.switch_user:
                         user = "O" if user == "X" else "X"
+                        board.current_player = user
 
             if event.type == pygame.MOUSEBUTTONUP:
                 move_sound_played = False
@@ -437,31 +358,58 @@ def game():
                     winner = None
                     is_draw = False
                     user = "X"
+                    board.current_player = "X"
+                    animation_timer = 0  # Reset animation timer
                 elif event.key == pygame.K_ESCAPE:
                     play_sound(button_sound)
                     return "Exit"
 
         surface.fill(CREAM_BG)
+        
+        # Draw turn indicator at the top of screen
+        if not board.gameover:
+            text = f"{board.current_player}'S TURN"
+            text_color = WIN_TEXT_X if board.current_player == "X" else WIN_TEXT_O
+            text_surf = turn_font.render(text, True, text_color)
+            text_rect = text_surf.get_rect(center=(300, 25))
+            surface.blit(text_surf, text_rect)
+            
+            # Draw line under the indicator
+            line_color = WIN_TEXT_X if board.current_player == "X" else WIN_TEXT_O
+            line_width = 2 + math.sin(animation_timer * 0.1) * 0.5  # Pulsing line width
+            pygame.draw.line(surface, line_color, (0, 45), (600, 45), int(line_width))
+        
         board.draw(surface)
 
-        # ✅ Draw WIN/LOSE or DRAW message when game is over
+        # If game is over, show winner message or draw
         if board.gameover:
-            overlay = pygame.Surface((600, 600), pygame.SRCALPHA)
-            overlay.fill((255, 255, 255, 150))
+            # Semi-transparent overlay
+            overlay = pygame.Surface((600, 650), pygame.SRCALPHA)
+            overlay.fill((255, 255, 255, 128))  # Fixed alpha value
             surface.blit(overlay, (0, 0))
+            
+            # Show winner text
             if is_draw:
                 result_text = win_font.render("DRAW!", True, DRAW_TEXT)
             else:
                 result_text = win_font.render(f"{winner} WINS!", True, WIN_TEXT_X if winner == "X" else WIN_TEXT_O)
-            result_rect = result_text.get_rect(center=(300, 250))
-            surface.blit(result_text, result_rect)
-            restart_text = instruction_font.render("Click or Press Any Key to Continue", True, BLACK)
+                
+            # Add pulsing scale effect to the text
+            scale = 1 + math.sin(animation_timer * 0.1) * 0.05
+            scaled_text = pygame.transform.scale(result_text, 
+                                              (int(result_text.get_width() * scale),
+                                               int(result_text.get_height() * scale)))
+            result_rect = scaled_text.get_rect(center=(300, 300))
+            surface.blit(scaled_text, result_rect)
+            
+            # Instructions text
+            restart_text = instruction_font.render("Press SPACE to play again or ESC for menu", True, BLACK)
             restart_rect = restart_text.get_rect(center=(300, 350))
             surface.blit(restart_text, restart_rect)
 
         pygame.display.flip()
 
-        # ✅ If game over, pause and WAIT for player click or key to move on
+        # If game over, pause and WAIT for player click or key to move on
         if board.gameover:
             waiting = True
             while waiting:
@@ -472,14 +420,13 @@ def game():
                     if event.type == pygame.MOUSEBUTTONDOWN or event.type == pygame.KEYDOWN:
                         waiting = False
 
-            # ✅ After waiting, return the winner or draw
+            # After waiting, return the winner or draw
             if winner:
                 return winner
             elif is_draw:
                 return "Draw"
 
-
-
+    return True  # Return to menu by default
 
 def best_of_three():
     player1_wins = 0
@@ -520,7 +467,6 @@ def best_of_three():
     surface.blit(final_text, final_rect)
     pygame.display.update()
     pygame.time.wait(3000)  # Pause to show final winner
-
 
 # Main program loop
 running = True
