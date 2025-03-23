@@ -102,15 +102,15 @@ class TicTacToeServer:
                     self.game_over = False
                     
                     if self.game_mode == "best_of_3":
-                        # Only increment round number when restarting in best-of-3 mode
-                        # and when the game is not over (player1_wins or player2_wins < rounds_needed)
-                        if self.player1_wins < self.rounds_needed and self.player2_wins < self.rounds_needed:
+                        # Check if we're restarting after a final win
+                        if self.player1_wins >= self.rounds_needed or self.player2_wins >= self.rounds_needed:
+                            # Reset for a completely new best-of-3 match
+                            self.reset_best_of_3()
+                            print("Starting a new best-of-3 match")
+                        # Only increment round number when restarting within an ongoing match
+                        elif self.player1_wins < self.rounds_needed and self.player2_wins < self.rounds_needed:
                             self.round_num += 1
                             print(f"Starting round {self.round_num} of best-of-3")
-                        else:
-                            # Reset for a new best-of-3 game if someone has already won
-                            self.reset_best_of_3()
-                            print(f"Starting a new best-of-3 game")
                     
                     self.broadcast({
                         "type": "restart_game",
@@ -137,17 +137,20 @@ class TicTacToeServer:
                     final_winner = "X" if self.player1_wins >= self.rounds_needed else "O"
                     print(f"Player {final_winner} has won the best-of-3 match!")
                     
-                    self.broadcast({
-                        "type": "restart_game_of_3",
-                        "round_num": self.round_num,
-                        "player1_wins": self.player1_wins,
-                        "player2_wins": self.player2_wins,
-                    })
-                    
-                    # Reset for the next best-of-3 game
-                    self.reset_best_of_3()
-                    self.game_over = True
-            except:
+                    # Only send this message once when a player reaches the win threshold
+                    # and only if we haven't already flagged the game as over
+                    if not self.game_over:
+                        self.broadcast({
+                            "type": "restart_game_of_3",
+                            "round_num": self.round_num,
+                            "player1_wins": self.player1_wins,
+                            "player2_wins": self.player2_wins,
+                        })
+                        
+                        # Set game_over flag to true to prevent repeated broadcasts
+                        self.game_over = True
+            except Exception as e:
+                print(f"Error in client handler: {e}")
                 break
         
 
@@ -160,10 +163,13 @@ class TicTacToeServer:
             self.clients.remove(client)
             self.addresses.pop(index)
             client.close()
+            print(f"Client disconnected. {len(self.clients)} clients remaining.")
             if len(self.clients) < 2:
-                self.board = [['' for _ in range(3)] for _ in range(3)]
-                self.current_player = "X"
-                self.game_over = False
+                # Don't reset the board if the game is over in best-of-3 mode
+                if not (self.game_mode == "best_of_3" and self.game_over):
+                    self.board = [['' for _ in range(3)] for _ in range(3)]
+                    self.current_player = "X"
+                    self.game_over = False
                 if self.clients:
                     self.clients[0].send(json.dumps({"type": "opponent_disconnected"}).encode())
 

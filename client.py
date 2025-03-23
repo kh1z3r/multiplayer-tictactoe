@@ -174,6 +174,10 @@ class NetworkGame:
                     self.current_player = data["current_player"]
                     self.winning_cells = []
                     
+                    # If round_num is in the data, update it (for best-of-3 mode)
+                    if "round_num" in data:
+                        self.round_num = data["round_num"]
+                    
                     # Reset any flags that might be active
                     self.show_current_score = False
                     self.show_final_winner = False
@@ -210,16 +214,19 @@ class NetworkGame:
                     self.player1_wins = data["player1_wins"]
                     self.player2_wins = data["player2_wins"]
                     self.show_final_winner = True
-                    self.request_restart()
-
+                    self.game_over = True
+                    # Do NOT call request_restart() here, we'll wait for user input
+                    
                 elif data["type"] == "current_score":
                     # We change current score when drawing the screen
                     self.show_current_score = True
 
-            except:
+            except Exception as e:
+                print(f"Connection error: {e}")
                 self.connected = False
                 break
 
+        print("Connection to server lost")
         self.connected = False
 
     def send_move(self, x, y):
@@ -247,6 +254,9 @@ class NetworkGame:
         """Request game restart from server"""
         if self.connected and self.game_over:
             try:
+                # Reset local state flags immediately to prevent visual issues
+                self.show_final_winner = False
+                
                 self.client.send(json.dumps({
                     "type": "restart"
                 }).encode())
@@ -301,8 +311,8 @@ class NetworkGame:
             line_width = 2 + math.sin(self.animation_timer * 0.1) * 0.5
             pygame.draw.line(self.surface, line_color, (0, 45), (600, 45), int(line_width))
 
-        # Draw game over overlay
-        if self.game_over:
+        # Draw game over overlay if we are on single mode or we are in best of 3 mode and no one has won yet
+        if self.game_over and (self.game_mode == 'single_game' or not(self.player1_wins >= self.rounds_needed or self.player2_wins >= self.rounds_needed)):
             overlay = pygame.Surface((600, 650), pygame.SRCALPHA)
             overlay.fill((255, 255, 255, 128))
             self.surface.blit(overlay, (0, 0))
@@ -320,18 +330,32 @@ class NetworkGame:
             result_rect = scaled_text.get_rect(center=(300, 300))
             self.surface.blit(scaled_text, result_rect)
             
-            # Add more context for best-of-3 mode
-            if self.game_mode == "best_of_3" and hasattr(self, 'player1_wins') and hasattr(self, 'player2_wins'):
+        # if we are in best of 3 mode and someone has won, we show the end screen
+        if self.game_over and self.game_mode == "best_of_3" and (self.player1_wins >= self.rounds_needed or self.player2_wins >= self.rounds_needed): # best of 3 mode
+            # similar to single mode end screen, but showing puntuations.
+            overlay = pygame.Surface((600, 650), pygame.SRCALPHA)
+            overlay.fill((255, 255, 255, 128))
+            self.surface.blit(overlay, (0, 0))
+            
+            if self.winner == "Draw":
+                result_text = win_font.render("DRAW!", True, DRAW_TEXT)
+            else:
+                result_text = win_font.render(f"{self.winner} WINS!", True, 
+                                            WIN_TEXT_X if self.winner == "X" else WIN_TEXT_O)
                 score_text = instruction_font.render(f"Score: X: {self.player1_wins} - O: {self.player2_wins}", True, BLACK)
                 score_rect = score_text.get_rect(center=(300, 380))
                 self.surface.blit(score_text, score_rect)
-                
-                next_round_text = instruction_font.render("Press SPACE for next round", True, BLACK)
-            else:
                 next_round_text = instruction_font.render("Press SPACE to play again", True, BLACK)
-            
-            restart_rect = next_round_text.get_rect(center=(300, 350))
-            self.surface.blit(next_round_text, restart_rect)
+                restart_rect = next_round_text.get_rect(center=(300, 350))
+                self.surface.blit(next_round_text, restart_rect)
+
+            scale = 1 + math.sin(self.animation_timer * 0.1) * 0.05
+            scaled_text = pygame.transform.scale(result_text, 
+                                             (int(result_text.get_width() * scale),
+                                              int(result_text.get_height() * scale)))
+            result_rect = scaled_text.get_rect(center=(300, 300))
+            self.surface.blit(scaled_text, result_rect)
+
 
         # Draw waiting message with background panel
         if self.waiting_for_opponent:
@@ -393,12 +417,15 @@ class NetworkGame:
 
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_SPACE and self.game_over:
+                        # If we're showing the final winner screen, clear that flag first
+                        if self.show_final_winner:
+                            self.show_final_winner = False
                         self.request_restart()
                         # Reset local game state to ensure consistency
                         self.show_final_winner = False
 
                 # when a round in best of 3 is finished, we show the current score
-                if self.show_current_score:
+                if self.show_current_score and not self.show_final_winner:
                     # Display current score on screen
                     self.surface.fill(CREAM_BG)
                     score_text = win_font.render(f"X - {self.player1_wins} | O - {self.player2_wins}", True, BLACK)
@@ -419,23 +446,19 @@ class NetworkGame:
                     final_rect = final_text.get_rect(center=(self.surface.get_width() // 2, self.surface.get_height() // 2))
                     self.surface.blit(final_text, final_rect)
                     
-                    # Add instruction for starting a new best-of-3 game
+                    # Add instruction for starting a new Best of 3 game
                     instruction_text = instruction_font.render("Press SPACE to start a new Best of 3 game", True, BLACK)
                     instruction_rect = instruction_text.get_rect(center=(self.surface.get_width() // 2, self.surface.get_height() // 2 + 60))
                     self.surface.blit(instruction_text, instruction_rect)
                     
                     pygame.display.update()
-                    pygame.time.wait(3000)  # Pause to show final winner
-                    
-                    # Reset the flag so we don't keep showing this message
-                    self.show_final_winner = False
-                    self.game_over = True
-                    
-                    # Now we wait for player to press space to restart
+                    # Don't continue with regular game drawing when showing final winner
+                    continue  # Add this line to prevents the regular game board from being drawn
 
             self.draw_board()
 
-            if not self.connected:
+            # Only exit the game loop if explicitly disconnected
+            if not self.connected and not self.waiting_for_opponent:
                 running = False
 
         if self.client:
