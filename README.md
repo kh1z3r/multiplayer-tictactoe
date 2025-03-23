@@ -10,8 +10,8 @@ A networked multiplayer Tic Tac Toe game with social features including friend m
 - Game lobby creation and management
 
 ## Team Members
-- Person A: Network Infrastructure
-- Person B: Game Logic & Mechanics - Kevin & Fareed
+- Person A: Network Infrastructure - Kevin, Khizer, Pedro
+- Person B: Game Logic & Mechanics - Kevin, Fareed, Juan
 - Person C: User Interface - Khizer
 - Person D: Friend System
 - Person E: Messaging & Lobby System
