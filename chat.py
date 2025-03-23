@@ -1,156 +1,131 @@
-import pygame
+import tkinter as tk
+from tkinter import scrolledtext
+import threading
 import time
 
-class ChatWindow:
+class TkChatWindow:
     def __init__(self, send_message_callback):
-        # Window setup
-        self.width = 400
-        self.height = 500
-        self.surface = pygame.display.set_mode((self.width, self.height), pygame.RESIZABLE)
-        pygame.display.set_caption('Tic Tac Toe - Chat')
+        # Run Tkinter in its own thread
+        self.thread = threading.Thread(target=self.create_window, args=(send_message_callback,))
+        self.thread.daemon = True
+        self.thread.start()
         
-        # Colors
-        self.bg_color = (240, 240, 240)
-        self.text_color = (0, 0, 0)
-        self.input_bg = (255, 255, 255)
-        self.button_color = (100, 180, 255)
-        self.button_hover = (150, 210, 255)
-        self.player_colors = {"X": (255, 100, 100), "O": (100, 100, 255)}
-        
-        # Chat elements
-        self.messages = []
-        self.input_text = ""
-        self.input_active = False
-        self.input_rect = pygame.Rect(10, self.height - 50, self.width - 110, 40)
-        self.send_button_rect = pygame.Rect(self.width - 90, self.height - 50, 80, 40)
-        
-        # Fonts
-        self.font = pygame.font.SysFont('arial', 16)
-        self.input_font = pygame.font.SysFont('arial', 18)
-        
-        # Function to call when sending a message
-        self.send_message_callback = send_message_callback
-        
-        # Store player symbol
         self.player_symbol = None
+        self.queue = []  # Queue for messages to be displayed
+        self.window = None  # Will be set in create_window
+        self.running = True  # Flag to control window lifetime
         
-        # Clock for controlling frame rate
-        self.clock = pygame.time.Clock()
+    def create_window(self, send_message_callback):
+        # Create a new window
+        self.window = tk.Tk()
+        self.window.title("Tic Tac Toe - Chat")
+        self.window.geometry("400x500")
         
-        # Flag to check if window is still running
-        self.running = True
+        # Create chat display area
+        self.chat_display = scrolledtext.ScrolledText(self.window, wrap=tk.WORD, state='disabled')
+        self.chat_display.pack(expand=True, fill='both', padx=10, pady=(10, 5))
         
-    def set_player_symbol(self, symbol):
-        self.player_symbol = symbol
+        # Create input frame
+        input_frame = tk.Frame(self.window)
+        input_frame.pack(fill='x', padx=10, pady=5)
         
+        # Create input field
+        self.input_text = tk.Entry(input_frame)
+        self.input_text.pack(side='left', expand=True, fill='x')
+        self.input_text.bind("<Return>", lambda e: self.send_message(send_message_callback))
+        
+        # Create send button
+        send_button = tk.Button(
+            input_frame, 
+            text="Send", 
+            command=lambda: self.send_message(send_message_callback)
+        )
+        send_button.pack(side='right', padx=(5, 0))
+        
+        # Set up periodic check for new messages
+        self.check_queue()
+        
+        # Handler for window closing
+        self.window.protocol("WM_DELETE_WINDOW", self.on_closing)
+        
+        # Run Tkinter main loop
+        while self.running:
+            try:
+                self.window.update()
+                # Small delay to prevent high CPU usage
+                time.sleep(0.01)
+            except tk.TclError:
+                # Window was likely closed
+                break
+    
+    def on_closing(self):
+        """Handle window closing event"""
+        self.running = False
+        if self.window:
+            self.window.destroy()
+    
+    def check_queue(self):
+        """Check for new messages in the queue and display them"""
+        if self.queue:
+            self.chat_display.config(state='normal')
+            for msg in self.queue:
+                # Format the message
+                timestamp = msg['timestamp']
+                player = msg['player']
+                text = msg['text']
+                
+                # Set message color based on player
+                if player == "X":
+                    tag = "player_x"
+                    color = "#ff6464"  # Red for X
+                elif player == "O":
+                    tag = "player_o"
+                    color = "#6464ff"  # Blue for O
+                else:
+                    tag = "system"
+                    color = "#646464"  # Gray for system
+                    
+                self.chat_display.tag_config(tag, foreground=color)
+                
+                # Insert the message
+                self.chat_display.insert(tk.END, f"[{timestamp}] {player}: ", tag)
+                self.chat_display.insert(tk.END, f"{text}\n")
+                
+            self.chat_display.config(state='disabled')
+            self.chat_display.see(tk.END)  # Scroll to the bottom
+            self.queue = []
+            
+        # Schedule next check
+        if self.window:
+            self.window.after(100, self.check_queue)
+    
+    def send_message(self, callback):
+        """Send a message from the input field"""
+        text = self.input_text.get().strip()
+        if text:
+            callback(text)
+            self.input_text.delete(0, tk.END)
+    
     def add_message(self, player, text):
-        # Add timestamp
+        """Add a message to the queue"""
         timestamp = time.strftime("%H:%M:%S")
-        self.messages.append({
+        self.queue.append({
             "player": player,
             "text": text,
             "timestamp": timestamp
         })
-        
-    def handle_events(self):
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.running = False
-                return False
-                
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                # Check if clicked on input box
-                if self.input_rect.collidepoint(event.pos):
-                    self.input_active = True
-                else:
-                    self.input_active = False
-                    
-                # Check if clicked send button
-                if self.send_button_rect.collidepoint(event.pos):
-                    if self.input_text:
-                        self.send_message_callback(self.input_text)
-                        self.input_text = ""
-                        
-            elif event.type == pygame.KEYDOWN:
-                if self.input_active:
-                    if event.key == pygame.K_RETURN:
-                        if self.input_text:
-                            self.send_message_callback(self.input_text)
-                            self.input_text = ""
-                    elif event.key == pygame.K_BACKSPACE:
-                        self.input_text = self.input_text[:-1]
-                    else:
-                        self.input_text += event.unicode
-                        
-            elif event.type == pygame.VIDEORESIZE:
-                # Update window size
-                self.width, self.height = event.size
-                self.surface = pygame.display.set_mode((self.width, self.height), pygame.RESIZABLE)
-                # Update input box and send button positions
-                self.input_rect = pygame.Rect(10, self.height - 50, self.width - 110, 40)
-                self.send_button_rect = pygame.Rect(self.width - 90, self.height - 50, 80, 40)
-        
-        return True
-            
-    def draw(self):
-        self.surface.fill(self.bg_color)
-        
-        # Draw message area with scrolling
-        message_area_height = self.height - 60
-        y_offset = message_area_height - min(message_area_height, len(self.messages) * 25)
-        
-        # Draw messages
-        for i, msg in enumerate(self.messages):
-            player_color = self.player_colors.get(msg["player"], self.text_color)
-            prefix = f"[{msg['timestamp']}] {msg['player']}: "
-            message_text = f"{prefix}{msg['text']}"
-            
-            # Wrap long messages
-            words = message_text.split(' ')
-            line = ""
-            y_pos = y_offset + i * 25
-            
-            for word in words:
-                test_line = line + word + " "
-                text_width, _ = self.font.size(test_line)
-                
-                if text_width < self.width - 20:
-                    line = test_line
-                else:
-                    text_surface = self.font.render(line, True, player_color)
-                    self.surface.blit(text_surface, (10, y_pos))
-                    y_pos += 20
-                    line = word + " "
-            
-            if line:
-                text_surface = self.font.render(line, True, player_color)
-                self.surface.blit(text_surface, (10, y_pos))
-        
-        # Draw input area
-        pygame.draw.rect(self.surface, self.input_bg, self.input_rect)
-        pygame.draw.rect(self.surface, self.text_color, self.input_rect, 2)
-        
-        # Draw input text
-        if self.input_text:
-            text_surface = self.input_font.render(self.input_text, True, self.text_color)
-            self.surface.blit(text_surface, (self.input_rect.x + 5, self.input_rect.y + 10))
-            
-        # Draw send button
-        mouse_pos = pygame.mouse.get_pos()
-        button_color = self.button_hover if self.send_button_rect.collidepoint(mouse_pos) else self.button_color
-        pygame.draw.rect(self.surface, button_color, self.send_button_rect)
-        pygame.draw.rect(self.surface, self.text_color, self.send_button_rect, 2)
-        
-        # Draw send button text
-        send_text = self.font.render("Send", True, (255, 255, 255))
-        send_text_rect = send_text.get_rect(center=self.send_button_rect.center)
-        self.surface.blit(send_text, send_text_rect)
-        
-        pygame.display.flip()
-        
+    
+    def set_player_symbol(self, symbol):
+        """Set the player's symbol"""
+        self.player_symbol = symbol
+        if self.window:
+            self.window.title(f"Tic Tac Toe - Chat (Player {symbol})")
+    
     def run(self):
-        """Run the chat window in its own loop"""
-        while self.running:
-            self.clock.tick(30)
-            self.handle_events()
-            self.draw() 
+        """Placeholder method - window is already running in its own thread"""
+        # The window is already running in its own thread when the class is instantiated
+        # This method is here for compatibility with the client's call to run()
+        pass
+
+# Alias TkChatWindow as ChatWindow for backwards compatibility with client.py
+ChatWindow = TkChatWindow 

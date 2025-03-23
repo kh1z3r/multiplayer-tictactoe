@@ -6,6 +6,7 @@ import sys
 import os
 from board import Board
 import math
+from chat import ChatWindow
 
 # Initialize pygame
 pygame.init()
@@ -111,7 +112,12 @@ class NetworkGame:
         self.player1_wins = 0
         self.player2_wins = 0
         self.rounds_needed = 2
-
+        
+        ######### Chat related properties #########
+        self.chat_window = None
+        # Chat button removed as chat opens automatically
+        self.chat_thread = None
+        self.pending_messages = []
 
 
     def connect_to_server(self, host):
@@ -128,6 +134,36 @@ class NetworkGame:
         except Exception as e:
             print(f"Connection error: {e}")
             return False
+    
+    ####### chat related methods #########
+    def open_chat_window(self):
+        """Open the chat window in a separate thread"""
+        if self.chat_window is None:
+            self.chat_window = ChatWindow(self.send_chat_message)
+            if self.player_symbol:
+                self.chat_window.set_player_symbol(self.player_symbol)
+            
+            # Add any pending messages
+            for msg in self.pending_messages:
+                self.chat_window.add_message(msg["player"], msg["text"])
+            self.pending_messages = []
+            
+            # Note: ChatWindow already creates its own thread in its __init__ method
+            # so we don't need to create another thread here.
+    
+    def send_chat_message(self, text):
+        """Send chat message to server"""
+        if self.connected and text:
+            try:
+                self.client.send(json.dumps({
+                    "type": "chat_message",
+                    "text": text
+                }).encode())
+            except Exception as e:
+                print(f"Error sending chat message: {e}")
+                self.connected = False
+
+    ####### end chat related methods #########
 
     def receive_messages(self):
         """Handle messages from server"""
@@ -142,10 +178,23 @@ class NetworkGame:
                 data = json.loads(message)
                 if data["type"] == "symbol":
                     self.player_symbol = data["symbol"]
+                    # Update chat window if it exists
+                    if self.chat_window:
+                        self.chat_window.set_player_symbol(self.player_symbol)
+                
+                elif data["type"] == "chat_message":
+                    # If chat window exists, add the message
+                    if self.chat_window:
+                        self.chat_window.add_message(data["player"], data["text"])
+                    else:
+                        # Store message for when chat window is opened
+                        self.pending_messages.append(data)
                 
                 elif data["type"] == "start_game":
                     self.waiting_for_opponent = False
                     self.current_player = data["current_player"]
+                    # Automatically open chat window when game starts
+                    self.open_chat_window()
                 
                 elif data["type"] == "update_board":
                     x, y = data["position"]
@@ -282,6 +331,7 @@ class NetworkGame:
         """Draw the game board and pieces"""
         self.surface.fill(CREAM_BG)
         
+        
         # Draw background pattern
         for i in range(0, 600, 20):
             for j in range(self.board.y_offset, 650, 20):
@@ -413,6 +463,9 @@ class NetworkGame:
                     running = False
 
                 if event.type == pygame.MOUSEBUTTONDOWN and not self.waiting_for_opponent:
+                    mouse_pos = pygame.mouse.get_pos()
+                    
+                    # Regular game click handling
                     if pygame.mouse.get_pressed()[0] and not self.game_over:
                         pos = pygame.mouse.get_pos()
                         x = pos[0] // 200
@@ -465,8 +518,13 @@ class NetworkGame:
             # Only exit the game loop if explicitly disconnected
             if not self.connected and not self.waiting_for_opponent:
                 running = False
-
+        
         if self.client:
+            # Clean up chat window when client disconnects
+            if self.chat_window:
+                # Signal the chat window to close
+                self.chat_window.running = False
+                self.chat_window = None
             self.client.close()
 
 def connection_screen():

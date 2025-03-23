@@ -19,6 +19,8 @@ class TicTacToeServer:
         self.rounds_needed = 2
         self.round_num = 1
         self.game_over = False
+        # Dictionary to keep track of which client is which player
+        self.player_symbols = {}
         print(f"Server started on {host}:{port}")
         print(f"Your IP address is: {socket.gethostbyname(socket.gethostname())}")
 
@@ -149,6 +151,17 @@ class TicTacToeServer:
                             "type": "update_game_mode",
                             "game_mode": self.game_mode
                         }).encode())
+
+                # Handle chat messages
+                elif data["type"] == "chat_message":
+                    # Get the player symbol for this client
+                    player = self.player_symbols[client]
+                    # Broadcast the chat message to all clients
+                    self.broadcast({
+                        "type": "chat_message",
+                        "player": player,
+                        "text": data["text"]
+                    })
 
                 # if someone wins the best of 3 game, we send a message to show the winner and let them decide to do another game or not
                 if self.player1_wins >= self.rounds_needed or self.player2_wins >= self.rounds_needed:
