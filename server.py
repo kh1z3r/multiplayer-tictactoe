@@ -12,6 +12,12 @@ class TicTacToeServer:
         self.addresses = []
         self.current_player = "X"
         self.board = [['' for _ in range(3)] for _ in range(3)]
+        self.game_mode = "single_game"  # default game mode
+        # for best of 3 game mode variables
+        self.player1_wins = 0
+        self.player2_wins = 0
+        self.rounds_needed = 2
+        self.round_num = 1
         self.game_over = False
         print(f"Server started on {host}:{port}")
         print(f"Your IP address is: {socket.gethostbyname(socket.gethostname())}")
@@ -34,6 +40,7 @@ class TicTacToeServer:
         if len(self.clients) == 2:
             self.broadcast({"type": "start_game", "current_player": self.current_player})
 
+        # this condition is always true unless we are in best of 3 game mode and it is over
         while True:
             try:
                 message = client.recv(1024).decode()
@@ -54,10 +61,24 @@ class TicTacToeServer:
                             })
 
                             if self.check_winner(player):
-                                self.broadcast({
-                                    "type": "game_over",
-                                    "winner": player
-                                })
+                                # checks game mode
+                                if self.game_mode == "single_game":
+                                    self.broadcast({
+                                        "type": "game_over",
+                                        "winner": player
+                                    })
+                                elif self.game_mode == "best_of_3":
+                                    if player == "X":
+                                        self.player1_wins += 1
+                                    elif player == "O":
+                                        self.player2_wins += 1
+                                    self.broadcast({
+                                        "type": "game_of_3_over",
+                                        "winner": player,
+                                        "round_num": self.round_num,
+                                        "player1_wins": self.player1_wins,
+                                        "player2_wins": self.player2_wins
+                                    })
                                 self.game_over = True
                             elif self.is_board_full():
                                 self.broadcast({
@@ -81,8 +102,27 @@ class TicTacToeServer:
                         "current_player": self.current_player
                     })
 
+                # this will only happen if the game mode is best of 3
+                elif data["type"] == "current_score":
+                    self.broadcast({
+                        "type": "current_score",
+                        "player1_wins": self.player1_wins,
+                        "player2_wins": self.player2_wins
+                    })
+
+                # if someone wins the best of 3 game, we send a message to show the winner and let them decide to do another game or not
+                if self.player1_wins > self.rounds_needed or self.player2_wins > self.rounds_needed:
+                    self.broadcast({
+                        "type": "restart_game_of_3",
+                        "round_num": self.round_num,
+                        "player1_wins": self.player1_wins,
+                        "player2_wins": self.player2_wins
+                    })
+                    self.game_over = True
+                    break
             except:
                 break
+        
 
         self.remove_client(client)
 

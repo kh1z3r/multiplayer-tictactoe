@@ -47,11 +47,11 @@ except:
     sounds_loaded = False
 
 # Font setup
-title_font = pygame.font.SysFont('comicsans', 72, bold=True)
-button_font = pygame.font.SysFont('comicsans', 48)
-win_font = pygame.font.SysFont('comicsans', 64, bold=True)
-instruction_font = pygame.font.SysFont('comicsans', 24)
-turn_font = pygame.font.SysFont('comicsans', 36, bold=True)
+title_font = pygame.font.SysFont('arial', 72, bold=True)
+button_font = pygame.font.SysFont('arial', 48)
+win_font = pygame.font.SysFont('arial', 64, bold=True)
+instruction_font = pygame.font.SysFont('arial', 24)
+turn_font = pygame.font.SysFont('arial', 36, bold=True)
 
 class Button:
     def __init__(self, x, y, width, height, text, text_color, bg_color, hover_color, shadow_color):
@@ -66,6 +66,7 @@ class Button:
         self.shadow_color = shadow_color
         self.shadow_offset = 5
         self.pressed = False
+
         
     def draw(self, surface):
         mouse_pos = pygame.mouse.get_pos()
@@ -104,6 +105,14 @@ class NetworkGame:
         self.waiting_for_opponent = True
         self.animation_timer = 0
         self.winning_cells = []
+        self.game_mode = "single"
+        self.show_current_score = False
+        self.show_final_winner = False
+        self.player1_wins = 0
+        self.player2_wins = 0
+        self.rounds_needed = 2
+
+
 
     def connect_to_server(self, host):
         """Connect to the game server"""
@@ -127,7 +136,9 @@ class NetworkGame:
                 message = self.client.recv(1024).decode()
                 if not message:
                     break
-                
+
+                # the rest of the messages are received from the server and contain something
+                # to say if you are 'x' or 'O'
                 data = json.loads(message)
                 if data["type"] == "symbol":
                     self.player_symbol = data["symbol"]
@@ -174,6 +185,31 @@ class NetworkGame:
                     self.connected = False
                     break
 
+                elif data["type"] == "game_of_3_over":
+                    self.show_current_score = True
+                    self.game_over = True
+                    self.winner = data["winner"]
+                    if sounds_loaded:
+                        if self.winner == "Draw":
+                            draw_sound.play()
+                        else:
+                            victory_sound.play()
+                    self.round_num = data["round_num"]
+                    self.player1_wins = data["player1_wins"]
+                    self.player2_wins = data["player2_wins"]
+                    self.request_restart()
+
+                elif data["type"] == "restart_game_of_3":
+                    self.round_num = data["round_num"]
+                    self.player1_wins = data["player1_wins"]
+                    self.player2_wins = data["player2_wins"]
+                    self.show_final_winner = True
+                    self.request_restart()
+
+                elif data["type"] == "current_score":
+                    # We change current score when drawing the screen
+                    self.show_current_score = True
+
             except:
                 self.connected = False
                 break
@@ -191,12 +227,32 @@ class NetworkGame:
             except:
                 self.connected = False
 
+    def send_game_mode(self):
+        """Send game mode to server"""
+        if self.connected:
+            try:
+                self.client.send(json.dumps({
+                    "type": "game_mode",
+                    "game_mode": self.game_mode}).encode())
+            except:
+                self.connected = False
+
     def request_restart(self):
         """Request game restart from server"""
         if self.connected and self.game_over:
             try:
                 self.client.send(json.dumps({
                     "type": "restart"
+                }).encode())
+            except:
+                self.connected = False
+    
+    def request_current_score(self):
+        """Request current score from server"""
+        if self.connected:
+            try:
+                self.client.send(json.dumps({
+                    "type": "current_score"
                 }).encode())
             except:
                 self.connected = False
@@ -324,6 +380,30 @@ class NetworkGame:
                     if event.key == pygame.K_SPACE and self.game_over:
                         self.request_restart()
 
+                # when a round in best of 3 is finished, we show the current score
+                if self.show_current_score:
+                    # Display current score on screen
+                    self.surface.fill(CREAM_BG)
+                    score_text = win_font.render(f"X - {self.player1_wins} | O - {self.player2_wins}", True, BLACK)
+                    score_rect = score_text.get_rect(center=(self.surface.get_width() // 2, self.surface.get_height() // 2 - 50))
+                    self.surface.blit(score_text, score_rect)
+                    pygame.display.update()
+                    pygame.time.wait(2000)  # Pause to show score
+
+                    self.show_current_score = False
+
+                # when there is a definite winner in best of 3, we show the final winner
+                if self.show_final_winner:
+                    final_winner = "Player X Wins!" if self.player1_wins == self.rounds_needed else "Player O Wins!"
+
+                    # Show winner on screen
+                    self.surface.fill(CREAM_BG)
+                    final_text = win_font.render(final_winner, True, WIN_TEXT_X if self.player1_wins == 2 else WIN_TEXT_O)  # 2 is the rounds needed to win
+                    final_rect = final_text.get_rect(center=(self.surface.get_width() // 2, self.surface.get_height() // 2))
+                    self.surface.blit(final_text, final_rect)
+                    pygame.display.update()
+                    pygame.time.wait(3000)  # Pause to show final winner
+
             self.draw_board()
 
             if not self.connected:
@@ -341,8 +421,12 @@ def connection_screen():
     host_button = Button(150, 200, 300, 60, "HOST GAME", BUTTON_TEXT, BUTTON_BG, BUTTON_HOVER, BUTTON_SHADOW)
     join_button = Button(150, 300, 300, 60, "JOIN GAME", BUTTON_TEXT, BUTTON_BG, BUTTON_HOVER, BUTTON_SHADOW)
     
+    best_of_3_button = Button(150, 450, 300, 60, "BEST OF 3", BUTTON_TEXT, BUTTON_BG, BUTTON_HOVER, BUTTON_SHADOW)
+    exit_button = Button(200, 550, 200, 60, "EXIT", BUTTON_TEXT, EXIT_BG, EXIT_HOVER, EXIT_SHADOW)
+
     ip_input = ""
     input_active = False
+    selected_mode = "single_game"
     input_rect = pygame.Rect(150, 400, 300, 40)
     
     while True:
@@ -355,6 +439,8 @@ def connection_screen():
         
         host_hover = host_button.draw(surface)
         join_hover = join_button.draw(surface)
+        best_of_3_hover = best_of_3_button.draw(surface)
+        exit_hover = exit_button.draw(surface)
         
         # Draw input box
         pygame.draw.rect(surface, BLACK if input_active else BUTTON_BG, input_rect, 2)
@@ -372,9 +458,26 @@ def connection_screen():
                 
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if host_hover:
-                    return "localhost"
+                    return ["localhost", selected_mode]
                 elif join_hover and ip_input:
-                    return ip_input
+                    return [ip_input, selected_mode]
+                # when best of 3 is clicked, its box will turn dark, as if the game modeselection is done
+                # it does not take you to another screen, it just means that the game mode is best of 3
+                elif best_of_3_hover:
+                    # if the game mode is not best of 3, it will be set to best of 3
+                    # if the game mode is best of 3, it will be set to single game
+                    if selected_mode == "best_of_3":
+                        selected_mode = "single_game"
+                        best_of_3_button.pressed = False
+                        best_of_3_button = Button(150, 450, 300, 60, "BEST OF 3", BUTTON_TEXT, BUTTON_BG, BUTTON_HOVER, BUTTON_SHADOW)
+                        best_of_3_button.draw(surface)
+                    else:
+                        selected_mode = "best_of_3"
+                        best_of_3_button.pressed = True
+                        best_of_3_button.draw(surface)
+                elif exit_hover:
+                    pygame.quit()
+                    sys.exit()
                 input_active = input_rect.collidepoint(event.pos)
                 
             if event.type == pygame.KEYDOWN:
@@ -385,15 +488,17 @@ def connection_screen():
                         ip_input = ip_input[:-1]
                     else:
                         ip_input += event.unicode
-        
+
         pygame.display.flip()
 
 def main():
     """Main program entry point"""
-    host = connection_screen()
+    host = connection_screen()[0]
+    game_mode = connection_screen()[1]
     if host:
         game = NetworkGame()
         if game.connect_to_server(host):
+            game.send_game_mode(game_mode)
             game.run()
         else:
             print("Failed to connect to server")
