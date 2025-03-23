@@ -141,7 +141,6 @@ class TicTacToeServer:
                     # Reset for the next best-of-3 game
                     self.reset_best_of_3()
                     self.game_over = True
-                    break
             except:
                 break
         
