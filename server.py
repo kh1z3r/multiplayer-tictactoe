@@ -2,6 +2,7 @@ import socket
 import threading
 import json
 import sys
+import time
 
 class TicTacToeServer:
     def __init__(self, host='0.0.0.0', port=5555):
@@ -39,9 +40,14 @@ class TicTacToeServer:
         self.player_symbols[client] = player  # Store which client is which player
         client.send(json.dumps({"type": "symbol", "symbol": player}).encode())
         
+        # Add a small delay between messages
+        time.sleep(0.1)
+        
         # If this client is player O, notify them of the current game mode
         if player == "O":
             client.send(json.dumps({"type": "update_game_mode", "game_mode": self.game_mode}).encode())
+            # Add a small delay between messages
+            time.sleep(0.1)
 
         # If we have two players, start the game
         if len(self.clients) == 2:

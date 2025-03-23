@@ -167,113 +167,140 @@ class NetworkGame:
 
     def receive_messages(self):
         """Handle messages from server"""
+        buffer = ""
         while self.connected:
             try:
-                message = self.client.recv(1024).decode()
-                if not message:
+                chunk = self.client.recv(1024).decode()
+                if not chunk:
                     break
 
-                # the rest of the messages are received from the server and contain something
-                # to say if you are 'x' or 'O'
-                data = json.loads(message)
-                if data["type"] == "symbol":
-                    self.player_symbol = data["symbol"]
-                    # Update chat window if it exists
-                    if self.chat_window:
-                        self.chat_window.set_player_symbol(self.player_symbol)
+                buffer += chunk
                 
-                elif data["type"] == "chat_message":
-                    # If chat window exists, add the message
-                    if self.chat_window:
-                        self.chat_window.add_message(data["player"], data["text"])
-                    else:
-                        # Store message for when chat window is opened
-                        self.pending_messages.append(data)
-                
-                elif data["type"] == "start_game":
-                    self.waiting_for_opponent = False
-                    self.current_player = data["current_player"]
-                    # Automatically open chat window when game starts
-                    self.open_chat_window()
-                
-                elif data["type"] == "update_board":
-                    x, y = data["position"]
-                    player = data["player"]
-                    self.board.grid_matrix[y][x] = player
-                    if sounds_loaded:
-                        sound = x_sound if player == "X" else o_sound
-                        sound.play()
-                
-                elif data["type"] == "next_turn":
-                    self.current_player = data["player"]
-                
-                elif data["type"] == "update_game_mode":
-                    # Update local game mode to match server's
-                    self.game_mode = data["game_mode"]
-                    print(f"Game mode set to: {self.game_mode}")
-                
-                elif data["type"] == "game_over":
-                    self.game_over = True
-                    self.winner = data["winner"]
-                    if sounds_loaded:
-                        if self.winner == "Draw":
-                            draw_sound.play()
-                        else:
-                            victory_sound.play()
-                
-                elif data["type"] == "restart_game":
-                    self.board.clear_board()
-                    self.game_over = False
-                    self.winner = None
-                    self.current_player = data["current_player"]
-                    self.winning_cells = []
-                    
-                    # If round_num is in the data, update it (for best-of-3 mode)
-                    if "round_num" in data:
-                        self.round_num = data["round_num"]
-                    
-                    # Reset any flags that might be active
-                    self.show_current_score = False
-                    self.show_final_winner = False
-                
-                elif data["type"] == "opponent_disconnected":
-                    self.waiting_for_opponent = True
-                    self.board.clear_board()
-                    self.game_over = False
-                    self.winner = None
-                
-                elif data["type"] == "server_full":
-                    print("Server is full!")
-                    self.connected = False
-                    break
-
-                elif data["type"] == "game_of_3_over":
-                    self.show_current_score = True
-                    self.game_over = True
-                    self.winner = data["winner"]
-                    if sounds_loaded:
-                        if self.winner == "Draw":
-                            draw_sound.play()
-                        else:
-                            victory_sound.play()
-                    self.round_num = data["round_num"]
-                    self.player1_wins = data["player1_wins"]
-                    self.player2_wins = data["player2_wins"]
-                    # Display a hint to press SPACE to continue to next round
-                    print("Press SPACE to continue to the next round")
-                    
-
-                elif data["type"] == "restart_game_of_3":
-                    self.round_num = data["round_num"]
-                    self.player1_wins = data["player1_wins"]
-                    self.player2_wins = data["player2_wins"]
-                    self.show_final_winner = True
-                    self.game_over = True
-                    # Do NOT call request_restart() here, we'll wait for user input
-                    
-                elif data["type"] == "current_score":
-                    # We change current score when drawing the screen
-                    self.show_current_score = True
+                # Process all complete messages in the buffer
+                while buffer:
+                    try:
+                        # Find the end of the first JSON object
+                        json_end = buffer.find("}")
+                        if json_end == -1:
+                            # No complete JSON object found, wait for more data
+                            break
+                            
+                        # Extract the complete JSON object (plus closing brace)
+                        json_end += 1
+                        message = buffer[:json_end]
+                        buffer = buffer[json_end:]  # Remove processed message from buffer
+                        
+                        # Try to parse the JSON
+                        data = json.loads(message)
+                        
+                        # Process the message based on its type
+                        if data["type"] == "symbol":
+                            self.player_symbol = data["symbol"]
+                            # Update chat window if it exists
+                            if self.chat_window:
+                                self.chat_window.set_player_symbol(self.player_symbol)
+                        
+                        elif data["type"] == "chat_message":
+                            # If chat window exists, add the message
+                            if self.chat_window:
+                                self.chat_window.add_message(data["player"], data["text"])
+                            else:
+                                # Store message for when chat window is opened
+                                self.pending_messages.append(data)
+                        
+                        elif data["type"] == "start_game":
+                            self.waiting_for_opponent = False
+                            self.current_player = data["current_player"]
+                            # Automatically open chat window when game starts
+                            self.open_chat_window()
+                        
+                        elif data["type"] == "update_board":
+                            x, y = data["position"]
+                            player = data["player"]
+                            self.board.grid_matrix[y][x] = player
+                            if sounds_loaded:
+                                sound = x_sound if player == "X" else o_sound
+                                sound.play()
+                        
+                        elif data["type"] == "next_turn":
+                            self.current_player = data["player"]
+                        
+                        elif data["type"] == "update_game_mode":
+                            # Update local game mode to match server's
+                            self.game_mode = data["game_mode"]
+                            print(f"Game mode set to: {self.game_mode}")
+                        
+                        elif data["type"] == "game_over":
+                            self.game_over = True
+                            self.winner = data["winner"]
+                            if sounds_loaded:
+                                if self.winner == "Draw":
+                                    draw_sound.play()
+                                else:
+                                    victory_sound.play()
+                        
+                        elif data["type"] == "restart_game":
+                            self.board.clear_board()
+                            self.game_over = False
+                            self.winner = None
+                            self.current_player = data["current_player"]
+                            self.winning_cells = []
+                            
+                            # If round_num is in the data, update it (for best-of-3 mode)
+                            if "round_num" in data:
+                                self.round_num = data["round_num"]
+                            
+                            # Reset any flags that might be active
+                            self.show_current_score = False
+                            self.show_final_winner = False
+                        
+                        elif data["type"] == "opponent_disconnected":
+                            self.waiting_for_opponent = True
+                            self.board.clear_board()
+                            self.game_over = False
+                            self.winner = None
+                        
+                        elif data["type"] == "server_full":
+                            print("Server is full!")
+                            self.connected = False
+                            break
+        
+                        elif data["type"] == "game_of_3_over":
+                            self.show_current_score = True
+                            self.game_over = True
+                            self.winner = data["winner"]
+                            if sounds_loaded:
+                                if self.winner == "Draw":
+                                    draw_sound.play()
+                                else:
+                                    victory_sound.play()
+                            self.round_num = data["round_num"]
+                            self.player1_wins = data["player1_wins"]
+                            self.player2_wins = data["player2_wins"]
+                            # Display a hint to press SPACE to continue to next round
+                            print("Press SPACE to continue to the next round")
+                            
+        
+                        elif data["type"] == "restart_game_of_3":
+                            self.round_num = data["round_num"]
+                            self.player1_wins = data["player1_wins"]
+                            self.player2_wins = data["player2_wins"]
+                            self.show_final_winner = True
+                            self.game_over = True
+                            # Do NOT call request_restart() here, we'll wait for user input
+                            
+                        elif data["type"] == "current_score":
+                            # We change current score when drawing the screen
+                            self.show_current_score = True
+                            
+                    except json.JSONDecodeError:
+                        # If we can't parse the JSON yet, we might have an incomplete message
+                        # Put the processed part back in the buffer and wait for more data
+                        break
+                    except Exception as e:
+                        print(f"Error processing message: {e}")
+                        # Continue to the next message
+                        continue
 
             except Exception as e:
                 print(f"Connection error: {e}")
