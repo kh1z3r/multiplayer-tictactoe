@@ -103,8 +103,14 @@ class TicTacToeServer:
                     
                     if self.game_mode == "best_of_3":
                         # Only increment round number when restarting in best-of-3 mode
-                        self.round_num += 1
-                        print(f"Starting round {self.round_num} of best-of-3")
+                        # and when the game is not over (player1_wins or player2_wins < rounds_needed)
+                        if self.player1_wins < self.rounds_needed and self.player2_wins < self.rounds_needed:
+                            self.round_num += 1
+                            print(f"Starting round {self.round_num} of best-of-3")
+                        else:
+                            # Reset for a new best-of-3 game if someone has already won
+                            self.reset_best_of_3()
+                            print(f"Starting a new best-of-3 game")
                     
                     self.broadcast({
                         "type": "restart_game",

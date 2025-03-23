@@ -173,6 +173,10 @@ class NetworkGame:
                     self.winner = None
                     self.current_player = data["current_player"]
                     self.winning_cells = []
+                    
+                    # Reset any flags that might be active
+                    self.show_current_score = False
+                    self.show_final_winner = False
                 
                 elif data["type"] == "opponent_disconnected":
                     self.waiting_for_opponent = True
@@ -390,6 +394,8 @@ class NetworkGame:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_SPACE and self.game_over:
                         self.request_restart()
+                        # Reset local game state to ensure consistency
+                        self.show_final_winner = False
 
                 # when a round in best of 3 is finished, we show the current score
                 if self.show_current_score:
@@ -412,8 +418,20 @@ class NetworkGame:
                     final_text = win_font.render(final_winner, True, WIN_TEXT_X if self.player1_wins >= self.rounds_needed else WIN_TEXT_O)
                     final_rect = final_text.get_rect(center=(self.surface.get_width() // 2, self.surface.get_height() // 2))
                     self.surface.blit(final_text, final_rect)
+                    
+                    # Add instruction for starting a new best-of-3 game
+                    instruction_text = instruction_font.render("Press SPACE to start a new Best of 3 game", True, BLACK)
+                    instruction_rect = instruction_text.get_rect(center=(self.surface.get_width() // 2, self.surface.get_height() // 2 + 60))
+                    self.surface.blit(instruction_text, instruction_rect)
+                    
                     pygame.display.update()
                     pygame.time.wait(3000)  # Pause to show final winner
+                    
+                    # Reset the flag so we don't keep showing this message
+                    self.show_final_winner = False
+                    self.game_over = True
+                    
+                    # Now we wait for player to press space to restart
 
             self.draw_board()
 
