@@ -493,12 +493,14 @@ def connection_screen():
 
 def main():
     """Main program entry point"""
-    host = connection_screen()[0]
-    game_mode = connection_screen()[1]
+    result = connection_screen()
+    host = result[0]
+    game_mode = result[1]
     if host:
         game = NetworkGame()
         if game.connect_to_server(host):
-            game.send_game_mode(game_mode)
+            game.game_mode = game_mode  # Set the game_mode property
+            game.send_game_mode()
             game.run()
         else:
             print("Failed to connect to server")

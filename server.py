@@ -110,6 +110,11 @@ class TicTacToeServer:
                         "player2_wins": self.player2_wins
                     })
 
+                # Handle game mode selection from client
+                elif data["type"] == "game_mode":
+                    self.game_mode = data["game_mode"]
+                    print(f"Game mode set to: {self.game_mode}")
+
                 # if someone wins the best of 3 game, we send a message to show the winner and let them decide to do another game or not
                 if self.player1_wins > self.rounds_needed or self.player2_wins > self.rounds_needed:
                     self.broadcast({
