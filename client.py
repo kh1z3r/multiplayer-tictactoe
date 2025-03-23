@@ -158,6 +158,11 @@ class NetworkGame:
                 elif data["type"] == "next_turn":
                     self.current_player = data["player"]
                 
+                elif data["type"] == "update_game_mode":
+                    # Update local game mode to match server's
+                    self.game_mode = data["game_mode"]
+                    print(f"Game mode set to: {self.game_mode}")
+                
                 elif data["type"] == "game_over":
                     self.game_over = True
                     self.winner = data["winner"]
@@ -469,7 +474,7 @@ def connection_screen():
     surface = pygame.display.set_mode(WINDOW_SIZE)
     pygame.display.set_caption('TIC TAC TOE - Connect')
     clock = pygame.time.Clock()
-    
+
     host_button = Button(150, 200, 300, 60, "HOST GAME", BUTTON_TEXT, BUTTON_BG, BUTTON_HOVER, BUTTON_SHADOW)
     join_button = Button(150, 300, 300, 60, "JOIN GAME", BUTTON_TEXT, BUTTON_BG, BUTTON_HOVER, BUTTON_SHADOW)
     
@@ -513,7 +518,7 @@ def connection_screen():
                     return ["localhost", selected_mode]
                 elif join_hover and ip_input:
                     return [ip_input, selected_mode]
-                # when best of 3 is clicked, its box will turn dark, as if the game modeselection is done
+                # when best of 3 is clicked, its box will turn dark, as if the game mode selection is done
                 # it does not take you to another screen, it just means that the game mode is best of 3
                 elif best_of_3_hover:
                     # if the game mode is not best of 3, it will be set to best of 3

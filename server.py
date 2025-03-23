@@ -34,7 +34,12 @@ class TicTacToeServer:
         """Handle individual client connection"""
         # Assign player symbol (X or O)
         player = "X" if len(self.clients) == 1 else "O"
+        self.player_symbols[client] = player  # Store which client is which player
         client.send(json.dumps({"type": "symbol", "symbol": player}).encode())
+        
+        # If this client is player O, notify them of the current game mode
+        if player == "O":
+            client.send(json.dumps({"type": "update_game_mode", "game_mode": self.game_mode}).encode())
 
         # If we have two players, start the game
         if len(self.clients) == 2:
@@ -129,8 +134,21 @@ class TicTacToeServer:
 
                 # Handle game mode selection from client
                 elif data["type"] == "game_mode":
-                    self.game_mode = data["game_mode"]
-                    print(f"Game mode set to: {self.game_mode}")
+                    # Only accept game mode changes from Player X (the host)
+                    if self.player_symbols[client] == "X":
+                        self.game_mode = data["game_mode"]
+                        print(f"Game mode set to: {self.game_mode}")
+                        # Broadcast the game mode to all clients
+                        self.broadcast({
+                            "type": "update_game_mode",
+                            "game_mode": self.game_mode
+                        })
+                    else:
+                        # Send the current game mode back to the client that tried to change it
+                        client.send(json.dumps({
+                            "type": "update_game_mode",
+                            "game_mode": self.game_mode
+                        }).encode())
 
                 # if someone wins the best of 3 game, we send a message to show the winner and let them decide to do another game or not
                 if self.player1_wins >= self.rounds_needed or self.player2_wins >= self.rounds_needed:

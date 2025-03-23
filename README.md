@@ -20,7 +20,7 @@ A networked multiplayer Tic Tac Toe game with social features including friend m
 | Game Logic & Mechanics | Kevin, Fareed, Juan |
 | User Interface | Khizer |
 | Friend System | *Unassigned* |
-| Messaging & Lobby System | *Unassigned* |
+| Messaging & Lobby System | Pedro |
 
 ## 🛠️ Setup Instructions
 
@@ -65,6 +65,9 @@ You'll see the following options:
 2. The server will start automatically
 3. Wait for an opponent to join your game
 4. Your IP address will be displayed for others to connect
+
+If you are playing online, in addition to prior steps, the host computer needs to:
+- Ensure port 5555 is open in their firewall/router
 
 ### Joining a Game
 
