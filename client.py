@@ -105,7 +105,7 @@ class NetworkGame:
         self.waiting_for_opponent = True
         self.animation_timer = 0
         self.winning_cells = []
-        self.game_mode = "single"
+        self.game_mode = "single_game"
         self.show_current_score = False
         self.show_final_winner = False
         self.player1_wins = 0
@@ -197,7 +197,9 @@ class NetworkGame:
                     self.round_num = data["round_num"]
                     self.player1_wins = data["player1_wins"]
                     self.player2_wins = data["player2_wins"]
-                    self.request_restart()
+                    # Display a hint to press SPACE to continue to next round
+                    print("Press SPACE to continue to the next round")
+                    
 
                 elif data["type"] == "restart_game_of_3":
                     self.round_num = data["round_num"]
@@ -314,9 +316,18 @@ class NetworkGame:
             result_rect = scaled_text.get_rect(center=(300, 300))
             self.surface.blit(scaled_text, result_rect)
             
-            restart_text = instruction_font.render("Press SPACE to play again", True, BLACK)
-            restart_rect = restart_text.get_rect(center=(300, 350))
-            self.surface.blit(restart_text, restart_rect)
+            # Add more context for best-of-3 mode
+            if self.game_mode == "best_of_3" and hasattr(self, 'player1_wins') and hasattr(self, 'player2_wins'):
+                score_text = instruction_font.render(f"Score: X: {self.player1_wins} - O: {self.player2_wins}", True, BLACK)
+                score_rect = score_text.get_rect(center=(300, 380))
+                self.surface.blit(score_text, score_rect)
+                
+                next_round_text = instruction_font.render("Press SPACE for next round", True, BLACK)
+            else:
+                next_round_text = instruction_font.render("Press SPACE to play again", True, BLACK)
+            
+            restart_rect = next_round_text.get_rect(center=(300, 350))
+            self.surface.blit(next_round_text, restart_rect)
 
         # Draw waiting message with background panel
         if self.waiting_for_opponent:
@@ -394,11 +405,11 @@ class NetworkGame:
 
                 # when there is a definite winner in best of 3, we show the final winner
                 if self.show_final_winner:
-                    final_winner = "Player X Wins!" if self.player1_wins == self.rounds_needed else "Player O Wins!"
+                    final_winner = "Player X Wins!" if self.player1_wins >= self.rounds_needed else "Player O Wins!"
 
                     # Show winner on screen
                     self.surface.fill(CREAM_BG)
-                    final_text = win_font.render(final_winner, True, WIN_TEXT_X if self.player1_wins == 2 else WIN_TEXT_O)  # 2 is the rounds needed to win
+                    final_text = win_font.render(final_winner, True, WIN_TEXT_X if self.player1_wins >= self.rounds_needed else WIN_TEXT_O)
                     final_rect = final_text.get_rect(center=(self.surface.get_width() // 2, self.surface.get_height() // 2))
                     self.surface.blit(final_text, final_rect)
                     pygame.display.update()

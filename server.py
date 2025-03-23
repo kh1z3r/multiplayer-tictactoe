@@ -70,16 +70,19 @@ class TicTacToeServer:
                                 elif self.game_mode == "best_of_3":
                                     if player == "X":
                                         self.player1_wins += 1
+                                        print(f"Player X won round {self.round_num}, total wins: {self.player1_wins}")
                                     elif player == "O":
                                         self.player2_wins += 1
+                                        print(f"Player O won round {self.round_num}, total wins: {self.player2_wins}")
                                     self.broadcast({
                                         "type": "game_of_3_over",
                                         "winner": player,
                                         "round_num": self.round_num,
                                         "player1_wins": self.player1_wins,
-                                        "player2_wins": self.player2_wins
+                                        "player2_wins": self.player2_wins,
                                     })
                                 self.game_over = True
+                                
                             elif self.is_board_full():
                                 self.broadcast({
                                     "type": "game_over",
@@ -97,9 +100,16 @@ class TicTacToeServer:
                     self.board = [['' for _ in range(3)] for _ in range(3)]
                     self.current_player = "X"
                     self.game_over = False
+                    
+                    if self.game_mode == "best_of_3":
+                        # Only increment round number when restarting in best-of-3 mode
+                        self.round_num += 1
+                        print(f"Starting round {self.round_num} of best-of-3")
+                    
                     self.broadcast({
                         "type": "restart_game",
-                        "current_player": self.current_player
+                        "current_player": self.current_player,
+                        "round_num": self.round_num  # Send round number to clients
                     })
 
                 # this will only happen if the game mode is best of 3
@@ -107,7 +117,8 @@ class TicTacToeServer:
                     self.broadcast({
                         "type": "current_score",
                         "player1_wins": self.player1_wins,
-                        "player2_wins": self.player2_wins
+                        "player2_wins": self.player2_wins,
+                        "round_num": self.round_num
                     })
 
                 # Handle game mode selection from client
@@ -116,13 +127,19 @@ class TicTacToeServer:
                     print(f"Game mode set to: {self.game_mode}")
 
                 # if someone wins the best of 3 game, we send a message to show the winner and let them decide to do another game or not
-                if self.player1_wins > self.rounds_needed or self.player2_wins > self.rounds_needed:
+                if self.player1_wins >= self.rounds_needed or self.player2_wins >= self.rounds_needed:
+                    final_winner = "X" if self.player1_wins >= self.rounds_needed else "O"
+                    print(f"Player {final_winner} has won the best-of-3 match!")
+                    
                     self.broadcast({
                         "type": "restart_game_of_3",
                         "round_num": self.round_num,
                         "player1_wins": self.player1_wins,
-                        "player2_wins": self.player2_wins
+                        "player2_wins": self.player2_wins,
                     })
+                    
+                    # Reset for the next best-of-3 game
+                    self.reset_best_of_3()
                     self.game_over = True
                     break
             except:
@@ -187,6 +204,13 @@ class TicTacToeServer:
             else:
                 client.send(json.dumps({"type": "server_full"}).encode())
                 client.close()
+
+    def reset_best_of_3(self):
+        """Reset the best-of-3 game state"""
+        self.player1_wins = 0
+        self.player2_wins = 0
+        self.round_num = 1
+        print("Best-of-3 game has been reset")
 
 if __name__ == "__main__":
     try:
