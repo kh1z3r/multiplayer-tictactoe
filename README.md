@@ -2,8 +2,6 @@
 
 A networked multiplayer Tic Tac Toe game with social features including friend management, messaging, and lobby creation.
 
-![Tic Tac Toe](https://raw.githubusercontent.com/username/multiplayer-tic-tac-toe/main/assets/game-preview.png)
-
 ## ✨ Features
 
 - Multiplayer Tic Tac Toe gameplay
