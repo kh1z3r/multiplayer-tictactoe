@@ -1,1 +1,0 @@
-#for main client application
