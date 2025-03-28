@@ -1,31 +1,25 @@
-# Multiplayer Tic Tac Toe
+# Tic Tac Toe Game
 
-A networked multiplayer Tic Tac Toe game with social features including friend management, messaging, and lobby creation.
+A Tic Tac Toe game with both multiplayer and singleplayer modes.
 
-## ✨ Features
+## 🎮 Game Modes
 
-- Multiplayer Tic Tac Toe gameplay
-- Best-of-three and best-of-five match options
-- Friend system (add, remove, search)
-- Direct messaging between friends
-- Game lobby creation and management
+### Multiplayer Mode
+Network-based multiplayer Tic Tac Toe with the following features:
+- Best-of-three match option
+- Real-time gameplay over network
+- In-game chat system
+- Score tracking
 
-## 👨‍💻 Team Members
-
-| Role | Team Members |
-|------|--------------|
-| Network Infrastructure | Kevin, Khizer, Pedro |
-| Game Logic & Mechanics | Kevin, Fareed, Juan |
-| User Interface | Khizer |
-| Friend System | *Unassigned* |
-| Messaging & Lobby System | Pedro |
+### Singleplayer Mode
+Local singleplayer mode against AI with adjustable difficulty.
 
 ## 🛠️ Setup Instructions
 
 1. Clone this repository
    ```bash
-   git clone https://github.com/username/multiplayer-tic-tac-toe.git
-   cd multiplayer-tic-tac-toe
+   git clone https://github.com/username/multiplayer-tictactoe.git
+   cd multiplayer-tictactoe
    ```
 
 2. Install required packages
@@ -33,21 +27,10 @@ A networked multiplayer Tic Tac Toe game with social features including friend m
    pip install -r requirements.txt
    ```
 
-3. Run the server
-   ```bash
-   python server.py
-   ```
-
-4. Run the client
-   ```bash
-   python client.py
-   ```
-
 ## How to Play
 
-### Starting a Game
-
-Launch the game using:
+### Multiplayer Mode
+Launch multiplayer mode using:
 ```bash
 python play.py
 ```
@@ -57,35 +40,54 @@ You'll see the following options:
 - Option 2: "Join Game" (to join someone's game)
 - Option 3: "Exit"
 
-### Hosting a Game
-
+#### Hosting a Multiplayer Game
 1. Select Option 1 from the main menu
-2. The server will start automatically
-3. Wait for an opponent to join your game
+2. Choose game mode (single game or best of three)
+3. Wait for an opponent to join
 4. Your IP address will be displayed for others to connect
 
-If you are playing online, in addition to prior steps, the host computer needs to:
-- Ensure port 5555 is open in their firewall/router
-
-### Joining a Game
-
+#### Joining a Multiplayer Game
 1. Select Option 2 from the main menu
-2. Enter the host's IP address
+2. Enter the host's IP address:
    - Use "localhost" or "127.0.0.1" if playing on the same computer
    - Use the host's IP address if playing over a network
 
-### Controls
+### Singleplayer Mode
+Launch singleplayer mode using:
+```bash
+python singleplayer/tictactoe_v3.py
+```
+
+## Controls
 
 | Control | Action |
 |---------|--------|
-| Mouse | Click to place your mark or select menu options |
-| SPACE | Start new round after a game ends |
-| ESC | Return to main menu |
+| Mouse | Click to place your mark |
+| SPACE | Continue to next round (in best of three) or play again (in single game) |
+| ESC | Exit to main menu |
+
+
+## Network Setup (Multiplayer Only)
+
+If playing multiplayer over the internet:
+- Host must ensure port 5555 is open in their firewall/router
+- Players must be able to connect to the host's IP address
 
 ## Troubleshooting
 
-- If the server doesn't start, check if port 5555 is available
-- If you can't connect, ensure the host's IP address is correct
-- Check your firewall settings if playing over a network
-- Ensure both players have the same version of the game
+### Multiplayer Issues
+- If server won't start: Check if port 5555 is available
+- Connection failed: Verify the host's IP address
+- Can't connect: Check firewall settings
+- Both players must have the same version of the game
+
+### General Issues
+- Make sure all required packages are installed
+- Verify Python version compatibility (Python 3.6 or higher recommended)
+- Check that all game assets are present in the correct folders
+
+## System Requirements
+- Python 3.6 or higher
+- Pygame library
+- Network connectivity (for multiplayer)
 
